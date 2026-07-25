@@ -42,6 +42,10 @@ jobs:
             target
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
 
+      # ============ 安装 Tauri CLI ============
+      - name: Install Tauri CLI
+        run: npm install -g @tauri-apps/cli
+
       # ============ 编译 ============
       - name: Build release
         working-directory: src-tauri
