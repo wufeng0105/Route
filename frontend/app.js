@@ -42,23 +42,19 @@ try {
 // ===== State =====
 let userConfig = null;
 let toolStatuses = [];
-let envStatus = null;
 let pendingSwitch = null;
 
 // ===== Init =====
 async function init() {
   try {
     showLoading();
-    const [statuses, config, env] = await Promise.all([
+    const [statuses, config] = await Promise.all([
       invoke('get_tool_statuses').catch(e => { console.error('get_tool_statuses failed:', e); return []; }),
-      invoke('get_user_config').catch(e => { console.error('get_user_config failed:', e); return { presetRoutes: [], customRoutes: [] }; }),
-      invoke('check_env').catch(e => { console.error('check_env failed:', e); return { node_installed: false, npm_installed: false }; })
+      invoke('get_user_config').catch(e => { console.error('get_user_config failed:', e); return { presetRoutes: [], customRoutes: [] }; })
     ]);
     toolStatuses = statuses || [];
     userConfig = config || { presetRoutes: [], customRoutes: [] };
-    envStatus = env || { node_installed: false, npm_installed: false };
     renderCards();
-    renderEnvStatus();
   } catch (e) {
     console.error('Init failed:', e);
     showError('初始化失败: ' + e.message);
@@ -125,36 +121,35 @@ function renderCards() {
     // 统一使用 flex 布局，所有按钮等宽排列，无论按钮数量
     const hasAuthFile = tool.id === 'codex';
     const configButtonText = tool.config_file === '.env' ? '.env' : 
-                             tool.config_file === 'settings.json' ? 'settings' : 
-                             tool.config_file;
+                             tool.config_file.replace(/\.[^/.]+$/, '');
     const configButtons = tool.config_exists
-      ? `<div class="pt-4 border-t" style="border-color: var(--outline-variant);">
-           <div class="flex gap-2">
-             <button onclick="openConfigDir('${tool.config_dir}')" class="flex-1 btn-ghost text-xs py-2">打开目录</button>
-             <button onclick="openConfigFile('${tool.config_dir}', '${tool.config_file}')" class="flex-1 btn-ghost text-xs py-2">打开 ${configButtonText}</button>
-             ${hasAuthFile ? `<button onclick="openAuthFile('${tool.config_dir}', '${tool.id}')" class="flex-1 btn-ghost text-xs py-2">打开 auth</button>` : ''}
+      ? `<div class="pt-2 border-t" style="border-color: var(--outline-variant);">
+           <div class="flex gap-1.5">
+             <button onclick="openConfigDir('${tool.config_dir}')" class="flex-1 btn-ghost text-xs py-1.5">打开目录</button>
+             <button onclick="openConfigFile('${tool.config_dir}', '${tool.config_file}')" class="flex-1 btn-ghost text-xs py-1.5">打开 ${configButtonText}</button>
+             ${hasAuthFile ? `<button onclick="openAuthFile('${tool.config_dir}', '${tool.id}')" class="flex-1 btn-ghost text-xs py-1.5">打开 auth</button>` : ''}
            </div>
          </div>`
-      : `<div class="pt-4 border-t space-y-2" style="border-color: var(--outline-variant);">${envStatus?.node_installed && envStatus?.npm_installed ? `<button onclick="handleInstall('${tool.id}')" class="w-full btn-primary">安装 ${escape(tool.name)}</button>` : `<button disabled class="w-full btn-ghost opacity-50 cursor-not-allowed">安装 ${escape(tool.name)} (需 Node.js)</button>`}<button onclick="openConfigDir('${tool.config_dir}')" class="w-full btn-ghost">打开目录</button></div>`;
+      : `<div class="pt-2 border-t space-y-1.5" style="border-color: var(--outline-variant);"><button onclick="handleInstall('${tool.id}')" class="w-full btn-primary">安装 ${escape(tool.name)}</button><button onclick="openConfigDir('${tool.config_dir}')" class="w-full btn-ghost">打开目录</button></div>`;
 
     const iconMap = { codex: 'terminal', claude: 'smart_toy', gemini: 'stars' };
     const icon = iconMap[tool.id] || 'apps';
 
-    return `<div class="card p-5 flex flex-col gap-4">
+    return `<div class="card p-3 flex flex-col gap-2">
 <div class="flex justify-between items-start">
-  <div class="flex items-center gap-3">
-    <div class="w-10 h-10 rounded-lg flex items-center justify-center" style="background: var(--surface-container);">
-      <span class="material-symbols-outlined" style="color: var(--primary);">${icon}</span>
+  <div class="flex items-center gap-2">
+    <div class="w-8 h-8 rounded-lg flex items-center justify-center" style="background: var(--surface-container);">
+      <span class="material-symbols-outlined text-sm" style="color: var(--primary);">${icon}</span>
     </div>
-    <h2 class="text-lg font-semibold">${escape(tool.name)}</h2>
+    <h2 class="text-sm font-semibold">${escape(tool.name)}</h2>
   </div>
   ${statusBadge}
 </div>
-<div class="space-y-2">
-  ${tool.config_exists && !tool.error ? `<p class="text-sm" style="color: var(--on-surface-variant);">当前线路: <span class="font-semibold" style="color: var(--primary);">${escape(getCurrentRouteName(tool))}</span></p>` : ''}
+<div class="space-y-1.5">
+  ${tool.config_exists && !tool.error ? `<p class="text-xs" style="color: var(--on-surface-variant);">当前线路: <span class="font-semibold" style="color: var(--primary);">${escape(getCurrentRouteName(tool))}</span></p>` : ''}
   ${urlBlock}
 </div>
-<div class="space-y-2 mt-2">
+<div class="space-y-1.5">
   ${routeButtons}
   ${customButtons}
   ${addButton}
@@ -179,31 +174,6 @@ function getCurrentRouteName(tool) {
     }
   }
   return '自定义';
-}
-
-// ===== Render: Env Status =====
-function renderEnvStatus() {
-  const nodeEl = document.getElementById('node-status');
-  const npmEl = document.getElementById('npm-status');
-  const readyEl = document.getElementById('env-ready');
-
-  if (envStatus?.node_installed) {
-    nodeEl.innerHTML = `<span class="material-symbols-outlined text-sm" style="color: var(--tertiary);">terminal</span><span style="color: var(--tertiary);">Node.js ${envStatus.node_version || ''}</span>`;
-  } else {
-    nodeEl.innerHTML = `<span class="material-symbols-outlined text-sm" style="color: var(--error);">terminal</span><span style="color: var(--error);">Node.js 未安装</span>`;
-  }
-
-  if (envStatus?.npm_installed) {
-    npmEl.innerHTML = `<span class="material-symbols-outlined text-sm" style="color: var(--tertiary);">package</span><span style="color: var(--tertiary);">npm ${envStatus.npm_version || ''}</span>`;
-  } else {
-    npmEl.innerHTML = `<span class="material-symbols-outlined text-sm" style="color: var(--error);">package</span><span style="color: var(--error);">npm 未安装</span>`;
-  }
-
-  if (envStatus?.node_installed && envStatus?.npm_installed) {
-    readyEl.innerHTML = `<span class="material-symbols-outlined text-sm" style="color: var(--tertiary);">check_circle</span><span class="font-semibold" style="color: var(--tertiary);">环境就绪</span>`;
-  } else {
-    readyEl.innerHTML = `<span class="material-symbols-outlined text-sm" style="color: var(--secondary);">warning</span><span style="color: var(--secondary);">切换可用，安装需 Node.js</span>`;
-  }
 }
 
 // ===== Switch Route =====
@@ -257,6 +227,11 @@ function openAddRoute(toolId) {
   document.getElementById('add-route-tool-name').textContent = toolName;
   document.getElementById('routeName').value = '';
   document.getElementById('routeUrl').value = '';
+  // 重置保存按钮为添加模式
+  const saveBtn = document.querySelector('#modal-add-route .btn-primary');
+  if (saveBtn) {
+    saveBtn.onclick = saveNewRoute;
+  }
   openModal('modal-add-route');
 }
 
@@ -349,32 +324,38 @@ async function deleteRoute(index) {
   }
 }
 
+let pendingEditIndex = null;
+
 async function editRoute(index) {
   const route = (userConfig?.customRoutes || [])[index];
   if (!route) return;
+  pendingEditIndex = index;
   closeModal('modal-manage-routes');
+  document.getElementById('add-route-tool-name').textContent = '编辑线路';
   document.getElementById('routeName').value = route.name;
   document.getElementById('routeUrl').value = route.url;
   openModal('modal-add-route');
 
-  const saveBtn = document.querySelector('button[onclick="saveNewRoute()"]');
-  saveBtn.onclick = async () => {
-    const name = document.getElementById('routeName').value.trim();
-    const url = document.getElementById('routeUrl').value.trim();
-    if (!name) { showToast('线路名称不能为空', 'warning'); return; }
-    if (!url || (!url.startsWith('http://') && !url.startsWith('https://'))) {
-      showToast('URL 格式无效', 'warning'); return;
-    }
-    try {
-      await invoke('edit_custom_route', { index, name, url });
-      showToast('自定义线路更新成功！', 'success');
-      closeModal('modal-add-route');
-      await refresh();
-      saveBtn.onclick = saveNewRoute;
-    } catch (e) {
-      showToast(`更新失败: ${e.message}`, 'error');
-    }
-  };
+  const saveBtn = document.querySelector('#modal-add-route .btn-primary');
+  if (saveBtn) {
+    saveBtn.onclick = async () => {
+      const name = document.getElementById('routeName').value.trim();
+      const url = document.getElementById('routeUrl').value.trim();
+      if (!name) { showToast('线路名称不能为空', 'warning'); return; }
+      if (!url || (!url.startsWith('http://') && !url.startsWith('https://'))) {
+        showToast('URL 格式无效', 'warning'); return;
+      }
+      try {
+        await invoke('edit_custom_route', { index, name, url });
+        showToast('自定义线路更新成功！', 'success');
+        closeModal('modal-add-route');
+        pendingEditIndex = null;
+        await refresh();
+      } catch (e) {
+        showToast(`更新失败: ${e.message}`, 'error');
+      }
+    };
+  }
 }
 
 // ===== Open Config =====
@@ -483,7 +464,20 @@ async function refresh() {
 }
 
 function openModal(id) { document.getElementById(id).classList.remove('hidden'); }
-function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
+function closeModal(id) {
+  document.getElementById(id).classList.add('hidden');
+  // 关闭添加/编辑弹窗时清理状态
+  if (id === 'modal-add-route') {
+    pendingAddToolId = null;
+    pendingEditIndex = null;
+    document.getElementById('routeName').value = '';
+    document.getElementById('routeUrl').value = '';
+    const saveBtn = document.querySelector('#modal-add-route .btn-primary');
+    if (saveBtn) {
+      saveBtn.onclick = saveNewRoute;
+    }
+  }
+}
 
 function showToast(msg, type = 'info') {
   const container = document.getElementById('toast-container');

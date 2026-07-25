@@ -149,14 +149,19 @@ pub fn load_user_config() -> UserConfig {
     }
 }
 
-/// 保存用户配置
+/// 保存用户配置（只保存自定义线路，预设线路始终从代码加载）
 pub fn save_user_config(config: &UserConfig) -> Result<(), String> {
     let config_dir = config_paths::ensure_user_config_dir()
         .map_err(|e| format!("创建配置目录失败: {}", e))?;
 
     let config_path = config_dir.join("config.json");
 
-    let json = serde_json::to_string_pretty(config)
+    // 只保存自定义线路，预设线路不写入用户文件
+    let save_data = serde_json::json!({
+        "customRoutes": config.custom_routes
+    });
+
+    let json = serde_json::to_string_pretty(&save_data)
         .map_err(|e| format!("序列化配置失败: {}", e))?;
 
     std::fs::write(&config_path, json)
@@ -253,6 +258,7 @@ fn is_valid_url(url: &str) -> bool {
 }
 
 /// 获取工具对应的线路 URL
+#[allow(dead_code)]
 pub fn get_route_url_for_tool<'a>(
     preset: &'a PresetRoute,
     tool_id: &str,

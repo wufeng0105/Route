@@ -1,0 +1,107 @@
+name: Build All Platforms
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'src-tauri/**'
+      - 'crates/**'
+      - 'frontend/**'
+      - '.github/workflows/build-all-platforms.yml'
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          - os: macos-latest
+            platform: macOS
+            artifact_name: Route-macOS
+            binary_path: target/release/bundle/macos/*.app
+          - os: ubuntu-22.04
+            platform: Linux
+            artifact_name: Route-Linux
+            binary_path: target/release/bundle/appimage/*.AppImage
+          - os: windows-latest
+            platform: Windows
+            artifact_name: Route-Windows
+            binary_path: target/release/app.exe
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install Linux dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential curl wget file
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Build release
+        run: cargo build -p app --release
+
+      - name: Package Windows
+        if: runner.os == 'Windows'
+        run: |
+          Copy-Item -Path "target/release/app.exe" -Destination "Route-Windows-x64.exe" -Force
+
+      - name: Package macOS
+        if: runner.os == 'macOS'
+        run: |
+          # 查找 .app bundle
+          APP_PATH=$(find target/release/bundle -name "*.app" -type d | head -1)
+          if [ -n "$APP_PATH" ]; then
+            echo "Found: $APP_PATH"
+            # 打包为 zip
+            zip -r "Route-macOS-x64.zip" "$APP_PATH"
+          else
+            echo "No .app found, copying binary"
+            cp target/release/app "Route-macOS-x64"
+          fi
+        shell: bash
+
+      - name: Package Linux
+        if: runner.os == 'Linux'
+        run: |
+          # 查找 AppImage
+          APPIMG=$(find target/release/bundle -name "*.AppImage" -type f | head -1)
+          if [ -n "$APPIMG" ]; then
+            echo "Found: $APPIMG"
+            cp "$APPIMG" "Route-Linux-x64.AppImage"
+          else
+            echo "No AppImage found, copying binary"
+            cp target/release/app "Route-Linux-x64"
+          fi
+        shell: bash
+
+      - name: Upload Windows artifact
+        if: runner.os == 'Windows'
+        uses: actions/upload-artifact@v4
+        with:
+          name: Route-Windows-x64
+          path: Route-Windows-x64.exe
+
+      - name: Upload macOS artifact
+        if: runner.os == 'macOS'
+        uses: actions/upload-artifact@v4
+        with:
+          name: Route-macOS-x64
+          path: Route-macOS-x64.*
+
+      - name: Upload Linux artifact
+        if: runner.os == 'Linux'
+        uses: actions/upload-artifact@v4
+        with:
+          name: Route-Linux-x64
+          path: Route-Linux-x64*

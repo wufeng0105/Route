@@ -41,8 +41,9 @@ body { background: var(--bg); color: var(--on-surface); }
   background: var(--primary);
   color: var(--on-primary);
   border-radius: 6px;
-  padding: 8px 16px;
+  padding: 6px 12px;
   font-weight: 500;
+  font-size: 13px;
   transition: opacity 0.2s;
 }
 .btn-primary:hover { opacity: 0.9; }
@@ -51,15 +52,17 @@ body { background: var(--bg); color: var(--on-surface); }
   color: var(--primary);
   border: 1px solid var(--primary);
   border-radius: 6px;
-  padding: 8px 16px;
+  padding: 6px 12px;
   font-weight: 500;
+  font-size: 13px;
 }
 .btn-outline:hover { background: var(--surface-low); }
 .btn-ghost {
   background: var(--surface-container);
   color: var(--secondary);
   border-radius: 6px;
-  padding: 8px 16px;
+  padding: 6px 12px;
+  font-size: 13px;
 }
 .btn-ghost:hover { background: #e7e7f3; }
 .status-badge {
@@ -77,8 +80,8 @@ body { background: var(--bg); color: var(--on-surface); }
   background: var(--surface-container);
   border: 1px solid var(--outline-variant);
   border-radius: 6px;
-  padding: 12px;
-  font-size: 13px;
+  padding: 8px 10px;
+  font-size: 12px;
   word-break: break-all;
 }
 .modal-backdrop {
@@ -97,7 +100,7 @@ body { background: var(--bg); color: var(--on-surface); }
   border-radius: 12px;
   box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1);
   z-index: 51;
-  max-width: 480px;
+  max-width: 420px;
   width: 90%;
 }
 .toast {
@@ -122,42 +125,38 @@ body { background: var(--bg); color: var(--on-surface); }
 
 <!-- Header -->
 <header class="sticky top-0 z-40 bg-white border-b" style="border-color: var(--outline-variant);">
-  <div class="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
-    <div class="flex items-center gap-3">
-      <span class="material-symbols-outlined text-2xl" style="color: var(--primary);">route</span>
-      <h1 class="text-xl font-bold" style="color: var(--primary);">Route 线路切换工具</h1>
+  <div class="max-w-5xl mx-auto px-4 py-2 flex justify-between items-center">
+    <div class="flex items-center gap-2">
+      <span class="material-symbols-outlined text-xl" style="color: var(--primary);">route</span>
+      <h1 class="text-base font-bold" style="color: var(--primary);">Route 线路切换工具</h1>
     </div>
-    <button onclick="openManageRoutes()" class="btn-ghost flex items-center gap-2">
-      <span class="material-symbols-outlined">list</span>
+    <button onclick="openManageRoutes()" class="btn-ghost flex items-center gap-1">
+      <span class="material-symbols-outlined text-sm">list</span>
       管理线路
     </button>
   </div>
 </header>
 
 <!-- Main -->
-<main class="flex-1 max-w-7xl mx-auto px-6 py-8 w-full">
-  <div id="cards-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-    <div class="col-span-full flex items-center justify-center py-20">
-      <span class="material-symbols-outlined animate-spin text-2xl" style="color: var(--primary);">progress_activity</span>
-      <span class="ml-3" style="color: var(--secondary);">加载中...</span>
+<main class="flex-1 max-w-5xl mx-auto px-4 py-4 w-full">
+  <div id="cards-grid" class="grid grid-cols-3 gap-3">
+    <div class="col-span-full flex items-center justify-center py-12">
+      <span class="material-symbols-outlined animate-spin text-xl" style="color: var(--primary);">progress_activity</span>
+      <span class="ml-2 text-sm" style="color: var(--secondary);">加载中...</span>
     </div>
   </div>
 </main>
 
 <!-- Footer -->
 <footer class="fixed bottom-0 w-full bg-white border-t z-50" style="border-color: var(--outline-variant);">
-  <div class="max-w-7xl mx-auto px-6 py-2 flex gap-6 text-sm">
-    <div id="node-status" class="flex items-center gap-2" style="color: var(--secondary);">
-      <span class="material-symbols-outlined text-sm">terminal</span>
-      <span>检测中...</span>
+  <div class="max-w-5xl mx-auto px-4 py-1.5 flex gap-4 text-xs">
+    <div id="app-version" class="flex items-center gap-2" style="color: var(--secondary);">
+      <span class="material-symbols-outlined text-sm">info</span>
+      <span>Route v0.1.0</span>
     </div>
-    <div id="npm-status" class="flex items-center gap-2" style="color: var(--secondary);">
-      <span class="material-symbols-outlined text-sm">package</span>
-      <span>检测中...</span>
-    </div>
-    <div id="env-ready" class="flex items-center gap-2 ml-auto" style="color: var(--secondary);">
+    <div id="app-status" class="flex items-center gap-2 ml-auto" style="color: var(--tertiary);">
       <span class="material-symbols-outlined text-sm">check_circle</span>
-      <span>检测中...</span>
+      <span>就绪</span>
     </div>
   </div>
 </footer>
@@ -166,11 +165,11 @@ body { background: var(--bg); color: var(--on-surface); }
 <div id="modal-switch" class="hidden">
   <div class="modal-backdrop" onclick="closeModal('modal-switch')"></div>
   <div class="modal">
-    <div class="p-6 border-b" style="border-color: var(--outline-variant);">
+    <div class="p-4 border-b" style="border-color: var(--outline-variant);">
       <div class="flex items-center justify-between">
-        <div class="flex items-center gap-3">
-          <span class="material-symbols-outlined" style="color: var(--primary);">info</span>
-          <h2 class="text-lg font-semibold">确认切换线路</h2>
+        <div class="flex items-center gap-2">
+          <span class="material-symbols-outlined text-sm" style="color: var(--primary);">info</span>
+          <h2 class="text-sm font-semibold">确认切换线路</h2>
         </div>
         <button onclick="closeModal('modal-switch')" class="p-1 hover:bg-gray-100 rounded">
           <span class="material-symbols-outlined">close</span>
@@ -233,11 +232,11 @@ body { background: var(--bg); color: var(--on-surface); }
       <div class="space-y-4">
         <div>
           <label class="block text-sm font-medium mb-1">线路名称</label>
-          <input id="routeName" type="text" placeholder="例如：我的中转站" class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2" style="border-color: var(--outline-variant);"/>
+          <input id="routeName" type="text" placeholder="例如：我的中转站" autocomplete="off" class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2" style="border-color: var(--outline-variant);"/>
         </div>
         <div>
           <label class="block text-sm font-medium mb-1">线路 URL</label>
-          <input id="routeUrl" type="url" placeholder="https://api.example.com" class="w-full px-3 py-2 border rounded-lg code focus:outline-none focus:ring-2" style="border-color: var(--outline-variant);"/>
+          <input id="routeUrl" type="url" placeholder="https://api.example.com" autocomplete="off" class="w-full px-3 py-2 border rounded-lg code focus:outline-none focus:ring-2" style="border-color: var(--outline-variant);"/>
           <p class="text-xs mt-1" style="color: var(--on-surface-variant);">请输入完整的 API 地址，包含 https:// 或 http://</p>
         </div>
       </div>

@@ -2,7 +2,6 @@ use dirs::home_dir;
 use std::path::PathBuf;
 
 /// 获取用户 Home 目录
-#[allow(dead_code)]
 pub fn get_home_dir() -> Option<PathBuf> {
     home_dir()
 }
@@ -42,6 +41,7 @@ pub fn ensure_user_config_dir() -> std::io::Result<PathBuf> {
 }
 
 /// 检查工具配置文件是否存在
+#[allow(dead_code)]
 pub fn tool_config_exists(config_dir: &str, config_file: &str) -> bool {
     get_tool_config_path(config_dir, config_file)
         .map(|p| p.exists())

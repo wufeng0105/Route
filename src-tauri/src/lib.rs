@@ -15,15 +15,6 @@ struct ToolStatus {
     config_file: String,
 }
 
-/// 环境检测结果
-#[derive(Debug, Clone, Serialize)]
-struct EnvStatus {
-    node_installed: bool,
-    npm_installed: bool,
-    node_version: Option<String>,
-    npm_version: Option<String>,
-}
-
 /// 切换结果（返回给前端）
 #[derive(Debug, Clone, Serialize)]
 struct SwitchResultDto {
@@ -88,56 +79,6 @@ fn get_tool_statuses() -> Vec<ToolStatus> {
 #[tauri::command]
 fn get_user_config() -> routes::UserConfig {
     routes::load_user_config()
-}
-
-/// 检测 Node.js 和 npm 环境
-#[tauri::command]
-fn check_env() -> EnvStatus {
-    // 检测 Node.js
-    let node_version = Command::new("node")
-        .arg("--version")
-        .output()
-        .ok()
-        .filter(|o| o.status.success())
-        .and_then(|o| String::from_utf8(o.stdout).ok())
-        .map(|s| s.trim().to_string());
-
-    // 检测 npm - 在 Windows 上 npm 是 npm.cmd，不是 npm.ps1
-    let npm_version = if cfg!(target_os = "windows") {
-        // 尝试 npm.cmd
-        Command::new("npm.cmd")
-            .arg("--version")
-            .output()
-            .ok()
-            .filter(|o| o.status.success())
-            .and_then(|o| String::from_utf8(o.stdout).ok())
-            .map(|s| s.trim().to_string())
-            .or_else(|| {
-                // 如果失败，尝试使用 cmd /c npm
-                Command::new("cmd")
-                    .args(&["/c", "npm", "--version"])
-                    .output()
-                    .ok()
-                    .filter(|o| o.status.success())
-                    .and_then(|o| String::from_utf8(o.stdout).ok())
-                    .map(|s| s.trim().to_string())
-            })
-    } else {
-        Command::new("npm")
-            .arg("--version")
-            .output()
-            .ok()
-            .filter(|o| o.status.success())
-            .and_then(|o| String::from_utf8(o.stdout).ok())
-            .map(|s| s.trim().to_string())
-    };
-
-    EnvStatus {
-        node_installed: node_version.is_some(),
-        npm_installed: npm_version.is_some(),
-        node_version,
-        npm_version,
-    }
 }
 
 /// 执行线路切换
@@ -411,7 +352,6 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             get_tool_statuses,
             get_user_config,
-            check_env,
             switch_route,
             add_custom_route,
             edit_custom_route,

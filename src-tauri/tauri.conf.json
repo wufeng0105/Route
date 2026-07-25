@@ -11,8 +11,8 @@
     "windows": [
       {
         "title": "Route 线路切换工具",
-                "width": 1280,
-        "height": 800,
+                "width": 960,
+        "height": 620,
         "resizable": true,
         "fullscreen": false
       }

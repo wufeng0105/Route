@@ -3,6 +3,7 @@ use crate::parsers::{ConfigFormat, ParsedConfig};
 use std::path::{Path, PathBuf};
 
 /// 切换结果
+#[derive(Debug)]
 pub struct SwitchResult {
     pub tool_name: String,
     pub target_url: String,
