@@ -52,6 +52,23 @@ jobs:
           echo "=== 4. Home 目录 ==="
           echo $HOME
 
+      # ============ 步骤 2.5: 创建模拟配置文件 ============
+      # npm install 只安装 CLI，配置文件在首次运行 claude 时才创建
+      # 这里手动创建一个真实的 settings.json 来测试 URL 替换
+      - name: Create mock Claude Code config
+        run: |
+          mkdir -p ~/.claude
+          cat > ~/.claude/settings.json << 'EOF'
+          {
+            "ANTHROPIC_BASE_URL": "https://api.anthropic.com",
+            "model": "claude-sonnet-4-20250514",
+            "maxTokens": 8192,
+            "apiKeyHelper": "/Users/runner/.claude/get_api_key.sh"
+          }
+          EOF
+          echo "=== 创建的模拟配置文件 ==="
+          cat ~/.claude/settings.json
+
       # ============ 步骤 3: 编译测试程序 ============
       - name: Build test program
         run: cargo build -p route-core --example claude_code_e2e --release
