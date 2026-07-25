@@ -21,7 +21,6 @@ pub fn create_backup(file_path: &Path) -> std::io::Result<std::path::PathBuf> {
     // 在非 Windows 平台上保留原文件权限
     #[cfg(unix)]
     {
-        use std::os::unix::fs::PermissionsExt;
         let metadata = fs::metadata(file_path)?;
         fs::set_permissions(&backup_path, metadata.permissions())?;
     }
