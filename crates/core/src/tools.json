@@ -1,0 +1,40 @@
+{
+  "tools": [
+    {
+      "id": "codex",
+      "name": "Codex CLI",
+      "configDir": ".codex",
+      "configFile": "config.toml",
+      "format": "toml",
+      "installCommands": {
+        "windows": "npm install -g @openai/codex",
+        "unix": "npm install -g @openai/codex"
+      },
+      "defaultConfig": "model = \"o4-mini\"\nbase_url = \"\"\n"
+    },
+    {
+      "id": "claude",
+      "name": "Claude Code",
+      "configDir": ".claude",
+      "configFile": "settings.json",
+      "format": "json",
+      "installCommands": {
+        "windows": "irm https://claude.ai/install.ps1 | iex",
+        "unix": "curl -fsSL https://claude.ai/install.sh | bash"
+      },
+      "defaultConfig": "{\n  \"ANTHROPIC_BASE_URL\": \"\"\n}\n"
+    },
+    {
+      "id": "gemini",
+      "name": "Gemini CLI",
+      "configDir": ".gemini",
+      "configFile": ".env",
+      "format": "env",
+      "installCommands": {
+        "windows": "npm install -g @google/gemini-cli",
+        "unix": "npm install -g @google/gemini-cli"
+      },
+      "defaultConfig": "GOOGLE_GEMINI_BASE_URL=\n"
+    }
+  ]
+}

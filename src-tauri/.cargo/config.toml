@@ -1,0 +1,4 @@
+# Tauri 项目 Cargo 配置
+# 使用 MSVC 工具链，静态链接 WebView2Loader（产出单文件 exe，无需 DLL）
+
+[target.x86_64-pc-windows-msvc]

@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Route 线路切换工具</title>
+<script src="assets/tailwind.js"></script>
+<link rel="stylesheet" href="assets/fonts.css"/>
+<link rel="stylesheet" href="assets/icons.css"/>
+<style>
+:root {
+  --bg: #faf8ff;
+  --surface: #ffffff;
+  --surface-low: #f3f3fe;
+  --surface-container: #ededf9;
+  --primary: #004ac6;
+  --primary-container: #2563eb;
+  --on-primary: #ffffff;
+  --secondary: #505f76;
+  --on-surface: #191b23;
+  --on-surface-variant: #434655;
+  --outline: #737686;
+  --outline-variant: #c3c6d7;
+  --tertiary: #006242;
+  --tertiary-container: #007d55;
+  --error: #ba1a1a;
+  --error-container: #ffdad6;
+  --success: #006242;
+}
+* { font-family: 'Inter', sans-serif; }
+.code { font-family: 'JetBrains Mono', monospace; }
+.material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
+body { background: var(--bg); color: var(--on-surface); }
+.card {
+  background: var(--surface);
+  border: 1px solid var(--outline-variant);
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+.btn-primary {
+  background: var(--primary);
+  color: var(--on-primary);
+  border-radius: 6px;
+  padding: 8px 16px;
+  font-weight: 500;
+  transition: opacity 0.2s;
+}
+.btn-primary:hover { opacity: 0.9; }
+.btn-outline {
+  background: transparent;
+  color: var(--primary);
+  border: 1px solid var(--primary);
+  border-radius: 6px;
+  padding: 8px 16px;
+  font-weight: 500;
+}
+.btn-outline:hover { background: var(--surface-low); }
+.btn-ghost {
+  background: var(--surface-container);
+  color: var(--secondary);
+  border-radius: 6px;
+  padding: 8px 16px;
+}
+.btn-ghost:hover { background: #e7e7f3; }
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 12px;
+  border-radius: 9999px;
+  font-size: 12px;
+  font-weight: 600;
+}
+.status-ok { background: #d1fae5; color: var(--tertiary); }
+.status-error { background: var(--error-container); color: var(--error); }
+.url-box {
+  background: var(--surface-container);
+  border: 1px solid var(--outline-variant);
+  border-radius: 6px;
+  padding: 12px;
+  font-size: 13px;
+  word-break: break-all;
+}
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.5);
+  backdrop-filter: blur(4px);
+  z-index: 50;
+}
+.modal {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: var(--surface);
+  border-radius: 12px;
+  box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1);
+  z-index: 51;
+  max-width: 480px;
+  width: 90%;
+}
+.toast {
+  position: fixed;
+  bottom: 80px;
+  right: 16px;
+  padding: 12px 20px;
+  border-radius: 8px;
+  color: white;
+  font-weight: 500;
+  animation: slideIn 0.3s ease;
+  z-index: 100;
+}
+@keyframes slideIn {
+  from { transform: translateX(100%); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+.hidden { display: none !important; }
+</style>
+</head>
+<body class="min-h-screen flex flex-col pb-12">
+
+<!-- Header -->
+<header class="sticky top-0 z-40 bg-white border-b" style="border-color: var(--outline-variant);">
+  <div class="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
+    <div class="flex items-center gap-3">
+      <span class="material-symbols-outlined text-2xl" style="color: var(--primary);">route</span>
+      <h1 class="text-xl font-bold" style="color: var(--primary);">Route 线路切换工具</h1>
+    </div>
+    <button onclick="openManageRoutes()" class="btn-ghost flex items-center gap-2">
+      <span class="material-symbols-outlined">list</span>
+      管理线路
+    </button>
+  </div>
+</header>
+
+<!-- Main -->
+<main class="flex-1 max-w-7xl mx-auto px-6 py-8 w-full">
+  <div id="cards-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+    <div class="col-span-full flex items-center justify-center py-20">
+      <span class="material-symbols-outlined animate-spin text-2xl" style="color: var(--primary);">progress_activity</span>
+      <span class="ml-3" style="color: var(--secondary);">加载中...</span>
+    </div>
+  </div>
+</main>
+
+<!-- Footer -->
+<footer class="fixed bottom-0 w-full bg-white border-t z-50" style="border-color: var(--outline-variant);">
+  <div class="max-w-7xl mx-auto px-6 py-2 flex gap-6 text-sm">
+    <div id="node-status" class="flex items-center gap-2" style="color: var(--secondary);">
+      <span class="material-symbols-outlined text-sm">terminal</span>
+      <span>检测中...</span>
+    </div>
+    <div id="npm-status" class="flex items-center gap-2" style="color: var(--secondary);">
+      <span class="material-symbols-outlined text-sm">package</span>
+      <span>检测中...</span>
+    </div>
+    <div id="env-ready" class="flex items-center gap-2 ml-auto" style="color: var(--secondary);">
+      <span class="material-symbols-outlined text-sm">check_circle</span>
+      <span>检测中...</span>
+    </div>
+  </div>
+</footer>
+
+<!-- Switch Modal -->
+<div id="modal-switch" class="hidden">
+  <div class="modal-backdrop" onclick="closeModal('modal-switch')"></div>
+  <div class="modal">
+    <div class="p-6 border-b" style="border-color: var(--outline-variant);">
+      <div class="flex items-center justify-between">
+        <div class="flex items-center gap-3">
+          <span class="material-symbols-outlined" style="color: var(--primary);">info</span>
+          <h2 class="text-lg font-semibold">确认切换线路</h2>
+        </div>
+        <button onclick="closeModal('modal-switch')" class="p-1 hover:bg-gray-100 rounded">
+          <span class="material-symbols-outlined">close</span>
+        </button>
+      </div>
+    </div>
+    <div class="p-6 space-y-4">
+      <div class="grid grid-cols-[80px_1fr] gap-y-3 text-sm">
+        <span style="color: var(--on-surface-variant);">工具</span>
+        <span id="switch-tool-name" class="font-semibold"></span>
+        <span style="color: var(--on-surface-variant);">线路变更</span>
+        <div class="flex items-center gap-2">
+          <span id="switch-from" style="color: var(--primary);"></span>
+          <span class="material-symbols-outlined text-sm" style="color: var(--outline);">arrow_forward</span>
+          <span id="switch-to" style="color: var(--tertiary);"></span>
+        </div>
+      </div>
+      <div class="border rounded-lg overflow-hidden" style="border-color: var(--outline-variant);">
+        <div class="p-3 flex items-center gap-3">
+          <span class="px-2 py-0.5 rounded text-xs font-medium" style="background: var(--error-container); color: var(--error);">当前</span>
+          <span id="switch-current-url" class="code text-sm truncate" style="color: var(--on-surface-variant);"></span>
+        </div>
+        <div class="h-px" style="background: var(--outline-variant);"></div>
+        <div class="p-3 flex items-center gap-3" style="background: rgba(0,98,66,0.05);">
+          <span class="px-2 py-0.5 rounded text-xs font-medium" style="background: #d1fae5; color: var(--tertiary);">目标</span>
+          <span id="switch-target-url" class="code text-sm truncate font-medium"></span>
+        </div>
+      </div>
+      <p class="text-sm flex items-center gap-2" style="color: var(--on-surface-variant);">
+        <span class="material-symbols-outlined text-sm">sync</span>
+        写入前将自动备份配置文件，失败自动回滚
+      </p>
+    </div>
+    <div class="p-6 border-t flex justify-end gap-3" style="border-color: var(--outline-variant);">
+      <button onclick="closeModal('modal-switch')" class="btn-ghost">取消</button>
+      <button id="btn-confirm-switch" class="btn-primary">确认切换</button>
+    </div>
+  </div>
+</div>
+
+<!-- Add Route Modal -->
+<div id="modal-add-route" class="hidden">
+  <div class="modal-backdrop" onclick="closeModal('modal-add-route')"></div>
+  <div class="modal" style="max-width: 440px;">
+    <div class="p-6 border-b" style="border-color: var(--outline-variant);">
+      <div class="flex items-center justify-between">
+        <div class="flex items-center gap-3">
+          <span class="material-symbols-outlined" style="color: var(--primary);">add</span>
+          <h2 class="text-lg font-semibold">添加自定义线路</h2>
+        </div>
+        <button onclick="closeModal('modal-add-route')" class="p-1 hover:bg-gray-100 rounded">
+          <span class="material-symbols-outlined">close</span>
+        </button>
+      </div>
+    </div>
+    <div class="p-6 space-y-4">
+      <div class="p-3 rounded border-l-2 text-sm" style="background: var(--surface-low); border-color: var(--outline);">
+        <p style="color: var(--on-surface-variant);">为 <span id="add-route-tool-name" class="font-semibold" style="color: var(--primary);"></span> 添加自定义线路</p>
+      </div>
+      <div class="space-y-4">
+        <div>
+          <label class="block text-sm font-medium mb-1">线路名称</label>
+          <input id="routeName" type="text" placeholder="例如：我的中转站" class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2" style="border-color: var(--outline-variant);"/>
+        </div>
+        <div>
+          <label class="block text-sm font-medium mb-1">线路 URL</label>
+          <input id="routeUrl" type="url" placeholder="https://api.example.com" class="w-full px-3 py-2 border rounded-lg code focus:outline-none focus:ring-2" style="border-color: var(--outline-variant);"/>
+          <p class="text-xs mt-1" style="color: var(--on-surface-variant);">请输入完整的 API 地址，包含 https:// 或 http://</p>
+        </div>
+      </div>
+    </div>
+    <div class="p-6 border-t flex justify-end gap-3" style="border-color: var(--outline-variant);">
+      <button onclick="closeModal('modal-add-route')" class="btn-ghost">取消</button>
+      <button onclick="saveNewRoute()" class="btn-primary">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- Manage Routes Modal -->
+<div id="modal-manage-routes" class="hidden">
+  <div class="modal-backdrop" onclick="closeModal('modal-manage-routes')"></div>
+  <div class="modal" style="max-width: 560px;">
+    <div class="p-6 border-b" style="border-color: var(--outline-variant);">
+      <div class="flex items-center justify-between">
+        <div class="flex items-center gap-3">
+          <span class="material-symbols-outlined" style="color: var(--primary);">list</span>
+          <h2 class="text-lg font-semibold">自定义线路管理</h2>
+        </div>
+        <button onclick="closeModal('modal-manage-routes')" class="p-1 hover:bg-gray-100 rounded">
+          <span class="material-symbols-outlined">close</span>
+        </button>
+      </div>
+    </div>
+    <div class="p-6">
+      <p class="text-sm mb-4" style="color: var(--on-surface-variant);">管理已添加的自定义线路，每个工具独立配置</p>
+      <div id="custom-routes-list" class="border rounded-lg overflow-hidden" style="border-color: var(--outline-variant);"></div>
+    </div>
+    <div class="p-6 border-t flex justify-between items-center" style="border-color: var(--outline-variant); background: var(--surface-container);">
+      <span id="route-count" class="text-sm" style="color: var(--secondary);">共 0 条自定义线路</span>
+      <button onclick="closeModal('modal-manage-routes'); openAddRouteFromManage()" class="btn-primary flex items-center gap-2">
+        <span class="material-symbols-outlined text-sm">add</span>
+        添加新线路
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Install Route Selection Modal -->
+<div id="modal-install-route" class="hidden">
+  <div class="modal-backdrop" onclick="closeModal('modal-install-route')"></div>
+  <div class="modal" style="max-width: 440px;">
+    <div class="p-6 border-b" style="border-color: var(--outline-variant);">
+      <div class="flex items-center justify-between">
+        <div class="flex items-center gap-3">
+          <span class="material-symbols-outlined" style="color: var(--primary);">download</span>
+          <h2 class="text-lg font-semibold">选择安装线路</h2>
+        </div>
+        <button onclick="closeModal('modal-install-route')" class="p-1 hover:bg-gray-100 rounded">
+          <span class="material-symbols-outlined">close</span>
+        </button>
+      </div>
+    </div>
+    <div class="p-6">
+      <p class="text-sm mb-4" style="color: var(--on-surface-variant);">选择安装 <span id="install-tool-name" class="font-semibold" style="color: var(--primary);"></span> 后使用的 API 线路</p>
+      <div id="install-route-list" class="space-y-2"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Toast Container -->
+<div id="toast-container"></div>
+
+<script src="app.js"></script>
+</body>
+</html>
