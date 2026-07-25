@@ -1,0 +1,75 @@
+name: Claude Code 端到端测试 (macOS)
+
+on:
+  workflow_dispatch:  # 手动触发
+  push:
+    branches: [main]
+    paths:
+      - 'crates/core/examples/**'
+      - '.github/workflows/claude-code-integration.yml'
+
+jobs:
+  claude-code-e2e:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            target
+          key: macos-cargo-${{ hashFiles('**/Cargo.lock') }}
+
+      # ============ 步骤 1: 安装 Claude Code ============
+      - name: Install Claude Code via npm
+        run: |
+          echo "=== npm 全局安装路径 ==="
+          npm root -g
+          echo ""
+          echo "=== 安装 Claude Code ==="
+          npm install -g @anthropic-ai/claude-code 2>&1 || echo "npm 安装失败，尝试官方脚本"
+          echo ""
+          echo "=== 验证安装 ==="
+          which claude 2>/dev/null && claude --version 2>/dev/null || echo "claude 命令不可用（可能需要 PATH 刷新）"
+
+      # ============ 步骤 2: 探索配置文件位置 ============
+      - name: Explore Claude Code config location
+        run: |
+          echo "=== 1. ~/.claude/ 目录 ==="
+          ls -la ~/.claude/ 2>/dev/null || echo "目录不存在"
+          echo ""
+          echo "=== 2. settings.json 文件 ==="
+          cat ~/.claude/settings.json 2>/dev/null || echo "文件不存在"
+          echo ""
+          echo "=== 3. 所有 .json 文件 ==="
+          find ~/.claude/ -name "*.json" -exec echo "--- {} ---" \; -exec cat {} \; 2>/dev/null || true
+          echo ""
+          echo "=== 4. Home 目录 ==="
+          echo $HOME
+
+      # ============ 步骤 3: 编译测试程序 ============
+      - name: Build test program
+        run: cargo build -p route-core --example claude_code_e2e --release
+
+      # ============ 步骤 4: 运行端到端测试 ============
+      - name: Run E2E test (replace base_url)
+        run: |
+          echo "=== 运行 safe_write 端到端测试 ==="
+          ./target/release/examples/claude_code_e2e
+
+      # ============ 步骤 5: 显示最终配置文件状态 ============
+      - name: Verify final state
+        run: |
+          echo "=== 最终 ~/.claude/ 目录 ==="
+          ls -la ~/.claude/ 2>/dev/null || true
+          echo ""
+          echo "=== 最终 settings.json ==="
+          cat ~/.claude/settings.json 2>/dev/null || true
+          echo ""
+          echo "=== 备份文件 ==="
+          ls -la ~/.claude/*.backup.* 2>/dev/null || echo "无备份文件"
