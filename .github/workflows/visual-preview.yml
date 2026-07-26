@@ -1,0 +1,149 @@
+name: Visual Preview
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        type: choice
+        description: '运行模式：screenshot=自动截图，vnc=VNC交互式调试'
+        options:
+          - screenshot
+          - vnc
+        default: screenshot
+
+jobs:
+  macos-visual:
+    runs-on: macos-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            target
+          key: macOS-cargo-visual-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Build release
+        run: cargo build -p app --release
+
+      - name: Find app bundle
+        id: find-app
+        run: |
+          APP_PATH=$(find target/release/bundle -name "*.app" -type d | head -1)
+          if [ -z "$APP_PATH" ]; then
+            echo "app_bundle=false"
+            echo "binary_path=target/release/app" >> $GITHUB_OUTPUT
+          else
+            echo "app_bundle=true" >> $GITHUB_OUTPUT
+            echo "app_path=$APP_PATH" >> $GITHUB_OUTPUT
+          fi
+        shell: bash
+
+      # ===========================================
+      # 模式 1: 自动截图
+      # ===========================================
+      - name: Launch app and capture screenshots
+        if: github.event.inputs.mode == 'screenshot'
+        run: |
+          # 启动应用
+          if [ "${{ steps.find-app.outputs.app_bundle }}" = "true" ]; then
+            APP_PATH="${{ steps.find-app.outputs.app_path }}"
+            echo "Opening .app bundle: $APP_PATH"
+            open "$APP_PATH"
+          else
+            echo "Running binary directly"
+            target/release/app &
+          fi
+
+          APP_PID=$!
+          echo "App PID: $APP_PID"
+
+          # 等待应用启动
+          echo "Waiting for app to load..."
+          sleep 8
+
+          # 截图 1: 主界面
+          echo "Taking screenshot 1: main window..."
+          screencapture -x -C screenshot-1-main.png
+          sleep 2
+
+          # 截图 2: 再截一张确保渲染完成
+          screencapture -x -C screenshot-2-after.png
+
+          # 列出截图文件
+          ls -la *.png
+
+          # 关闭应用
+          if [ "${{ steps.find-app.outputs.app_bundle }}" = "true" ]; then
+            osascript -e 'quit app "Route"'
+          else
+            kill $APP_PID 2>/dev/null || true
+          fi
+        shell: bash
+
+      - name: Upload screenshots
+        if: github.event.inputs.mode == 'screenshot'
+        uses: actions/upload-artifact@v4
+        with:
+          name: macOS-screenshots
+          path: screenshot-*.png
+          retention-days: 30
+
+      # ===========================================
+      # 模式 2: VNC 交互式调试
+      # ===========================================
+      - name: Setup VNC for interactive debugging
+        if: github.event.inputs.mode == 'vnc'
+        uses: mxschmitt/action-tmate@v3
+        with:
+          detached: true
+          timeout-minutes: 20
+
+      - name: Enable VNC and launch app
+        if: github.event.inputs.mode == 'vnc'
+        run: |
+          # 启用 macOS 屏幕共享 (VNC)
+          echo "Enabling screen sharing (VNC)..."
+          sudo defaults write /var/db/launchd.db/com.apple.launchd/overrides.plist com.apple.screensharing -dict Disabled -bool false
+          sudo launchctl load -w /System/Library/LaunchDaemons/com.apple.screensharing.plist
+
+          # 设置 VNC 密码
+          echo "Setting VNC password..."
+          # 使用 macOS 的 security 工具设置 VNC 密码
+          sudo /usr/bin/vncpasswd -f <<< "route123" | sudo defaults write /Library/Preferences/com.apple.RemoteDesktop VNCSettings -data 2>/dev/null || true
+
+          # 启动应用
+          if [ "${{ steps.find-app.outputs.app_bundle }}" = "true" ]; then
+            APP_PATH="${{ steps.find-app.outputs.app_path }}"
+            echo "Opening .app bundle: $APP_PATH"
+            open "$APP_PATH"
+          else
+            echo "Running binary directly"
+            target/release/app &
+          fi
+
+          echo ""
+          echo "============================================"
+          echo "  VNC 调试环境已就绪"
+          echo "============================================"
+          echo ""
+          echo "步骤 1: 在上方的 tmate 步骤输出中找到 SSH 连接字符串"
+          echo "步骤 2: 在本地终端执行 SSH 端口转发:"
+          echo "  ssh -L 5900:localhost:5900 <tmate-ssh-命令>"
+          echo "步骤 3: 打开 VNC 客户端 (如 Finder > 前往 > 连接服务器 > vnc://localhost:5900)"
+          echo "步骤 4: VNC 密码: route123"
+          echo ""
+          echo "============================================"
+          echo ""
+
+          # 等待用户连接（最多 20 分钟）
+          echo "等待连接中... 此步骤会保持运行 15 分钟"
+          sleep 900
+        shell: bash
