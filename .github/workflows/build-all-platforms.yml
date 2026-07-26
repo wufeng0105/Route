@@ -34,6 +34,9 @@ jobs:
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
 
+      - name: Install Tauri CLI
+        run: cargo install tauri-cli --version "^2.0.0" --locked
+
       - name: Install Linux dependencies
         if: runner.os == 'Linux'
         run: |
@@ -48,8 +51,21 @@ jobs:
             target
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
 
-      - name: Build release
-        run: cargo build -p app --release
+      - name: Build release with bundle
+        run: cargo tauri build
+
+      - name: Ad-hoc sign macOS app
+        if: runner.os == 'macOS'
+        run: |
+          # 查找 .app bundle
+          APP_PATH=$(find target/release/bundle -name "*.app" -type d | head -1)
+          if [ -n "$APP_PATH" ]; then
+            echo "Ad-hoc signing: $APP_PATH"
+            # 使用 ad-hoc 签名（- 表示自签名，不关联 Apple ID）
+            codesign --force --deep --sign - "$APP_PATH"
+            codesign -dv "$APP_PATH" 2>&1 | head -10
+          fi
+        shell: bash
 
       - name: Package Windows
         if: runner.os == 'Windows'
@@ -63,8 +79,22 @@ jobs:
           APP_PATH=$(find target/release/bundle -name "*.app" -type d | head -1)
           if [ -n "$APP_PATH" ]; then
             echo "Found: $APP_PATH"
-            # 打包为 zip
-            zip -r "Route-macOS-x64.zip" "$APP_PATH"
+            # 创建带说明的压缩包
+            cat > "README-macOS.txt" << 'EOF'
+Route 线路切换工具 - macOS 版
+
+安装说明：
+1. 解压 Route-macOS-x64.zip
+2. 将 Route.app 拖到 Applications 文件夹
+3. 首次打开时，按住 Control 键点击应用图标，选择"打开"
+   （或前往 系统设置 > 隐私与安全性 > 安全性，点击"仍要打开"）
+
+注意：本应用使用 Ad-hoc 签名，未经过 Apple 公证。
+      这是正常的，请按照上述步骤允许运行。
+
+系统要求：macOS 10.13 或更高版本
+EOF
+            zip -r "Route-macOS-x64.zip" "$APP_PATH" "README-macOS.txt"
           else
             echo "No .app found, copying binary"
             cp target/release/app "Route-macOS-x64"
