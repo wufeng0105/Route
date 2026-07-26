@@ -22,6 +22,9 @@ jobs:
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
 
+      - name: Install Tauri CLI
+        run: cargo install tauri-cli --version "^2.0.0" --locked
+
       - name: Cache cargo
         uses: actions/cache@v4
         with:
@@ -30,21 +33,8 @@ jobs:
             target
           key: macOS-cargo-visual-${{ hashFiles('**/Cargo.lock') }}
 
-      - name: Build release
-        run: cargo build -p app --release
-
-      - name: Find app bundle
-        id: find-app
-        run: |
-          APP_PATH=$(find target/release/bundle -name "*.app" -type d | head -1)
-          if [ -z "$APP_PATH" ]; then
-            echo "app_bundle=false"
-            echo "binary_path=target/release/app" >> $GITHUB_OUTPUT
-          else
-            echo "app_bundle=true" >> $GITHUB_OUTPUT
-            echo "app_path=$APP_PATH" >> $GITHUB_OUTPUT
-          fi
-        shell: bash
+      - name: Build release (with bundle)
+        run: cargo tauri build
 
       # ===========================================
       # 模式 1: 自动截图
@@ -52,40 +42,41 @@ jobs:
       - name: Launch app and capture screenshots
         if: github.event.inputs.mode == 'screenshot'
         run: |
-          # 启动应用
-          if [ "${{ steps.find-app.outputs.app_bundle }}" = "true" ]; then
-            APP_PATH="${{ steps.find-app.outputs.app_path }}"
-            echo "Opening .app bundle: $APP_PATH"
+          # 查找 .app bundle
+          APP_PATH=$(find target/release/bundle -name "*.app" -type d 2>/dev/null | head -1)
+
+          if [ -n "$APP_PATH" ]; then
+            echo "Found .app bundle: $APP_PATH"
+            # 移除隔离属性，允许运行未签名应用
+            sudo xattr -rd com.apple.quarantine "$APP_PATH" 2>/dev/null || true
             open "$APP_PATH"
           else
-            echo "Running binary directly"
+            echo "No .app bundle found, running binary directly"
+            sudo xattr -rd com.apple.quarantine target/release/app 2>/dev/null || true
             target/release/app &
           fi
 
-          APP_PID=$!
-          echo "App PID: $APP_PID"
-
           # 等待应用启动
           echo "Waiting for app to load..."
-          sleep 8
+          sleep 10
 
           # 截图 1: 主界面
           echo "Taking screenshot 1: main window..."
           screencapture -x -C screenshot-1-main.png
-          sleep 2
+          sleep 3
 
-          # 截图 2: 再截一张确保渲染完成
+          # 截图 2: 确保渲染完成
+          echo "Taking screenshot 2: after render..."
           screencapture -x -C screenshot-2-after.png
 
           # 列出截图文件
           ls -la *.png
 
           # 关闭应用
-          if [ "${{ steps.find-app.outputs.app_bundle }}" = "true" ]; then
-            osascript -e 'quit app "Route"'
-          else
-            kill $APP_PID 2>/dev/null || true
-          fi
+          echo "Closing app..."
+          osascript -e 'tell application "Route" to quit' 2>/dev/null || true
+          osascript -e 'tell application "route" to quit' 2>/dev/null || true
+          pkill -f "target/release/app" 2>/dev/null || true
         shell: bash
 
       - name: Upload screenshots
@@ -99,7 +90,7 @@ jobs:
       # ===========================================
       # 模式 2: VNC 交互式调试
       # ===========================================
-      - name: Setup VNC for interactive debugging
+      - name: Setup tmate session for VNC
         if: github.event.inputs.mode == 'vnc'
         uses: mxschmitt/action-tmate@v3
         with:
@@ -112,20 +103,22 @@ jobs:
           # 启用 macOS 屏幕共享 (VNC)
           echo "Enabling screen sharing (VNC)..."
           sudo defaults write /var/db/launchd.db/com.apple.launchd/overrides.plist com.apple.screensharing -dict Disabled -bool false
-          sudo launchctl load -w /System/Library/LaunchDaemons/com.apple.screensharing.plist
+          sudo launchctl load -w /System/Library/LaunchDaemons/com.apple.screensharing.plist 2>/dev/null || true
 
           # 设置 VNC 密码
           echo "Setting VNC password..."
-          # 使用 macOS 的 security 工具设置 VNC 密码
-          sudo /usr/bin/vncpasswd -f <<< "route123" | sudo defaults write /Library/Preferences/com.apple.RemoteDesktop VNCSettings -data 2>/dev/null || true
+          printf "route123\nroute123\nn\n" | sudo /usr/bin/vncpasswd /tmp/vnc_passwd 2>/dev/null || true
+          sudo defaults write /Library/Preferences/com.apple.VNCSettings.txt VNCPassword -string "$(echo -n "route123" | base64)" 2>/dev/null || true
 
-          # 启动应用
-          if [ "${{ steps.find-app.outputs.app_bundle }}" = "true" ]; then
-            APP_PATH="${{ steps.find-app.outputs.app_path }}"
+          # 查找并启动应用
+          APP_PATH=$(find target/release/bundle -name "*.app" -type d 2>/dev/null | head -1)
+          if [ -n "$APP_PATH" ]; then
             echo "Opening .app bundle: $APP_PATH"
+            sudo xattr -rd com.apple.quarantine "$APP_PATH" 2>/dev/null || true
             open "$APP_PATH"
           else
             echo "Running binary directly"
+            sudo xattr -rd com.apple.quarantine target/release/app 2>/dev/null || true
             target/release/app &
           fi
 
@@ -134,16 +127,25 @@ jobs:
           echo "  VNC 调试环境已就绪"
           echo "============================================"
           echo ""
-          echo "步骤 1: 在上方的 tmate 步骤输出中找到 SSH 连接字符串"
+          echo "步骤 1: 在上方 tmate 步骤的输出中找到 SSH 连接字符串"
+          echo "  (形如: ssh abc123@nyc1.tmate.io)"
+          echo ""
           echo "步骤 2: 在本地终端执行 SSH 端口转发:"
           echo "  ssh -L 5900:localhost:5900 <tmate-ssh-命令>"
-          echo "步骤 3: 打开 VNC 客户端 (如 Finder > 前往 > 连接服务器 > vnc://localhost:5900)"
-          echo "步骤 4: VNC 密码: route123"
+          echo ""
+          echo "步骤 3: 用 VNC 客户端连接:"
+          echo "  macOS: Finder > 前往 > 连接服务器 > vnc://localhost:5900"
+          echo "  Windows: 使用 TightVNC / RealVNC 连接 localhost:5900"
+          echo "  VNC 密码: route123"
+          echo ""
+          echo "步骤 4: 操作完成后, 在 tmate 会话中执行:"
+          echo "  touch continue  (或 sudo touch /continue)"
+          echo "  以结束工作流"
           echo ""
           echo "============================================"
           echo ""
 
-          # 等待用户连接（最多 20 分钟）
+          # 保持运行等待用户连接
           echo "等待连接中... 此步骤会保持运行 15 分钟"
           sleep 900
         shell: bash
