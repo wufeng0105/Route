@@ -16,6 +16,8 @@ pub struct ToolDef {
     pub install_commands: InstallCommands,
     #[serde(rename = "defaultConfig")]
     pub default_config: String,
+    #[serde(rename = "authFile", default)]
+    pub auth_file: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -112,7 +114,10 @@ pub fn default_user_config() -> UserConfig {
 pub fn load_user_config() -> UserConfig {
     let config_path = match config_paths::get_user_config_path() {
         Some(p) => p,
-        None => return default_user_config(),
+        None => {
+            eprintln!("警告: 无法确定 Home 目录，使用默认配置");
+            return default_user_config();
+        }
     };
 
     if !config_path.exists() {
@@ -129,7 +134,11 @@ pub fn load_user_config() -> UserConfig {
                     config.preset_routes = default.preset_routes;
                     config
                 }
-                Err(_) => {
+                Err(e) => {
+                    eprintln!(
+                        "警告: 用户配置文件解析失败 ({}), 将尝试保留自定义线路并使用默认预设",
+                        e
+                    );
                     // 解析失败，使用默认配置但保留尝试读取自定义线路
                     let mut config = default_user_config();
                     if let Ok(json) = serde_json::from_str::<serde_json::Value>(&content) {
@@ -145,7 +154,13 @@ pub fn load_user_config() -> UserConfig {
                 }
             }
         }
-        Err(_) => default_user_config(),
+        Err(e) => {
+            eprintln!(
+                "警告: 读取用户配置文件失败 ({}), 使用默认配置",
+                e
+            );
+            default_user_config()
+        }
     }
 }
 

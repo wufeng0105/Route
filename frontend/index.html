@@ -248,6 +248,63 @@ body { background: var(--bg); color: var(--on-surface); }
   </div>
 </div>
 
+<!-- Edit Route Modal -->
+<div id="modal-edit-route" class="hidden">
+  <div class="modal-backdrop" onclick="closeModal('modal-edit-route')"></div>
+  <div class="modal" style="max-width: 440px;">
+    <div class="p-6 border-b" style="border-color: var(--outline-variant);">
+      <div class="flex items-center justify-between">
+        <div class="flex items-center gap-3">
+          <span class="material-symbols-outlined" style="color: var(--primary);">edit</span>
+          <h2 class="text-lg font-semibold">编辑自定义线路</h2>
+        </div>
+        <button onclick="closeModal('modal-edit-route')" class="p-1 hover:bg-gray-100 rounded">
+          <span class="material-symbols-outlined">close</span>
+        </button>
+      </div>
+    </div>
+    <div class="p-6 space-y-4">
+      <div class="space-y-4">
+        <div>
+          <label class="block text-sm font-medium mb-1">线路名称</label>
+          <input id="editRouteName" type="text" placeholder="例如：我的中转站" autocomplete="off" class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2" style="border-color: var(--outline-variant);"/>
+        </div>
+        <div>
+          <label class="block text-sm font-medium mb-1">线路 URL</label>
+          <input id="editRouteUrl" type="url" placeholder="https://api.example.com" autocomplete="off" class="w-full px-3 py-2 border rounded-lg code focus:outline-none focus:ring-2" style="border-color: var(--outline-variant);"/>
+          <p class="text-xs mt-1" style="color: var(--on-surface-variant);">请输入完整的 API 地址，包含 https:// 或 http://</p>
+        </div>
+      </div>
+    </div>
+    <div class="p-6 border-t flex justify-end gap-3" style="border-color: var(--outline-variant);">
+      <button onclick="closeModal('modal-edit-route')" class="btn-ghost">取消</button>
+      <button id="btn-confirm-edit" class="btn-primary">保存修改</button>
+    </div>
+  </div>
+</div>
+
+<!-- Tool Select Modal -->
+<div id="modal-tool-select" class="hidden">
+  <div class="modal-backdrop" onclick="closeModal('modal-tool-select')"></div>
+  <div class="modal" style="max-width: 360px;">
+    <div class="p-6 border-b" style="border-color: var(--outline-variant);">
+      <div class="flex items-center justify-between">
+        <div class="flex items-center gap-3">
+          <span class="material-symbols-outlined" style="color: var(--primary);">apps</span>
+          <h2 class="text-lg font-semibold">选择工具</h2>
+        </div>
+        <button onclick="closeModal('modal-tool-select')" class="p-1 hover:bg-gray-100 rounded">
+          <span class="material-symbols-outlined">close</span>
+        </button>
+      </div>
+    </div>
+    <div class="p-6">
+      <p class="text-sm mb-4" style="color: var(--on-surface-variant);">选择要添加线路的工具</p>
+      <div id="tool-select-list" class="space-y-2"></div>
+    </div>
+  </div>
+</div>
+
 <!-- Manage Routes Modal -->
 <div id="modal-manage-routes" class="hidden">
   <div class="modal-backdrop" onclick="closeModal('modal-manage-routes')"></div>

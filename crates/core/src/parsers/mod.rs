@@ -377,4 +377,35 @@ base_url = "https://old.example.com"
         let urls = config.find_base_urls();
         assert_eq!(urls.len(), 2);
     }
+
+    #[test]
+    fn test_env_serialize_preserves_trailing_newline() {
+        // 原始内容有尾部换行
+        let content = "# Comment\nGOOGLE_GEMINI_BASE_URL=https://old.example.com\nAPI_KEY=xxx\n";
+        let config = ParsedConfig::parse(content, ConfigFormat::Env).unwrap();
+        let serialized = config.serialize().unwrap();
+        assert!(serialized.ends_with('\n'), "ENV 序列化应保留尾部换行");
+        assert_eq!(serialized, "# Comment\nGOOGLE_GEMINI_BASE_URL=https://old.example.com\nAPI_KEY=xxx\n");
+    }
+
+    #[test]
+    fn test_env_serialize_no_trailing_newline_adds_one() {
+        // 原始内容无尾部换行 — 序列化后补上（POSIX 规范）
+        let content = "GOOGLE_GEMINI_BASE_URL=https://old.example.com";
+        let config = ParsedConfig::parse(content, ConfigFormat::Env).unwrap();
+        let serialized = config.serialize().unwrap();
+        assert!(serialized.ends_with('\n'), "ENV 序列化应确保文件以换行结尾");
+    }
+
+    #[test]
+    fn test_env_replace_preserves_format() {
+        let content = "# Comment\nGOOGLE_GEMINI_BASE_URL=https://old.example.com\nAPI_KEY=xxx\n";
+        let mut config = ParsedConfig::parse(content, ConfigFormat::Env).unwrap();
+        config.replace_base_url("https://new.example.com");
+        let serialized = config.serialize().unwrap();
+        assert!(serialized.contains("# Comment"));
+        assert!(serialized.contains("https://new.example.com"));
+        assert!(serialized.contains("API_KEY=xxx"));
+        assert!(serialized.ends_with('\n'));
+    }
 }

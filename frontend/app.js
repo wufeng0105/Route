@@ -11,33 +11,13 @@ try {
   } else {
     throw new Error('Tauri API not found');
   }
-} catch (e) {
-  console.error('Failed to access Tauri API:', e);
-  // Mock for testing in browser
-  invoke = async (cmd, args) => {
-    console.log('Mock invoke:', cmd, args);
-    if (cmd === 'get_tool_statuses') {
-      return [
-        { id: 'codex', name: 'Codex CLI', config_exists: true, current_url: 'https://api.example.com/codex', format: 'toml', config_dir: '.codex', config_file: 'config.toml' },
-        { id: 'claude', name: 'Claude Code', config_exists: true, current_url: 'https://api.example.com/claude', format: 'json', config_dir: '.claude', config_file: 'settings.json' },
-        { id: 'gemini', name: 'Gemini CLI', config_exists: false, format: 'env', config_dir: '.gemini', config_file: '.env' }
-      ];
-    }
-    if (cmd === 'get_user_config') {
-      return {
-        presetRoutes: [
-          { id: 'global', name: '全球高保', urls: { codex: 'https://api.aicodemirror.ai/api/codex', claude: 'https://api.aicodemirror.ai/api/claudecode', gemini: 'https://api.aicodemirror.ai/api/gemini' } },
-          { id: 'domestic', name: '国内优化', urls: { codex: 'https://api.claudecode.net.cn/api/codex', claude: 'https://api.claudecode.net.cn/api/claudecode', gemini: 'https://api.claudecode.net.cn/api/gemini' } }
-        ],
-        customRoutes: []
-      };
-    }
-    if (cmd === 'check_env') {
-      return { node_installed: true, npm_installed: true, node_version: 'v20.11.0', npm_version: '10.2.4' };
-    }
-    return { success: true };
-  };
-}
+  } catch (e) {
+    console.error('Failed to access Tauri API:', e);
+    // Tauri API 不可用 — 不静默降级到 Mock 数据，显式提示用户
+    invoke = async (cmd, args) => {
+      throw new Error('后端服务不可用，无法连接到 Tauri 运行时。请确认应用正在通过 Tauri 启动而非浏览器中打开。');
+    };
+  }
 
 // ===== State =====
 let userConfig = null;
@@ -119,7 +99,7 @@ function renderCards() {
 
     // 构建配置操作按钮组
     // 统一使用 flex 布局，所有按钮等宽排列，无论按钮数量
-    const hasAuthFile = tool.id === 'codex';
+    const hasAuthFile = !!tool.auth_file;
     const configButtonText = tool.config_file === '.env' ? '.env' : 
                              tool.config_file.replace(/\.[^/.]+$/, '');
     const configButtons = tool.config_exists
@@ -127,7 +107,7 @@ function renderCards() {
            <div class="flex gap-1.5">
              <button onclick="openConfigDir('${tool.config_dir}')" class="flex-1 btn-ghost text-xs py-1.5">打开目录</button>
              <button onclick="openConfigFile('${tool.config_dir}', '${tool.config_file}')" class="flex-1 btn-ghost text-xs py-1.5">打开 ${configButtonText}</button>
-             ${hasAuthFile ? `<button onclick="openAuthFile('${tool.config_dir}', '${tool.id}')" class="flex-1 btn-ghost text-xs py-1.5">打开 auth</button>` : ''}
+             ${hasAuthFile ? `<button onclick="openAuthFile('${tool.config_dir}', '${escape(tool.auth_file)}')" class="flex-1 btn-ghost text-xs py-1.5">打开 auth</button>` : ''}
            </div>
          </div>`
       : `<div class="pt-2 border-t space-y-1.5" style="border-color: var(--outline-variant);"><button onclick="handleInstall('${tool.id}')" class="w-full btn-primary">安装 ${escape(tool.name)}</button><button onclick="openConfigDir('${tool.config_dir}')" class="w-full btn-ghost">打开目录</button></div>`;
@@ -330,33 +310,31 @@ async function editRoute(index) {
   const route = (userConfig?.customRoutes || [])[index];
   if (!route) return;
   pendingEditIndex = index;
-  closeModal('modal-manage-routes');
-  document.getElementById('add-route-tool-name').textContent = '编辑线路';
-  document.getElementById('routeName').value = route.name;
-  document.getElementById('routeUrl').value = route.url;
-  openModal('modal-add-route');
-
-  const saveBtn = document.querySelector('#modal-add-route .btn-primary');
-  if (saveBtn) {
-    saveBtn.onclick = async () => {
-      const name = document.getElementById('routeName').value.trim();
-      const url = document.getElementById('routeUrl').value.trim();
-      if (!name) { showToast('线路名称不能为空', 'warning'); return; }
-      if (!url || (!url.startsWith('http://') && !url.startsWith('https://'))) {
-        showToast('URL 格式无效', 'warning'); return;
-      }
-      try {
-        await invoke('edit_custom_route', { index, name, url });
-        showToast('自定义线路更新成功！', 'success');
-        closeModal('modal-add-route');
-        pendingEditIndex = null;
-        await refresh();
-      } catch (e) {
-        showToast(`更新失败: ${e.message}`, 'error');
-      }
-    };
-  }
+  document.getElementById('editRouteName').value = route.name;
+  document.getElementById('editRouteUrl').value = route.url;
+  openModal('modal-edit-route');
 }
+
+document.getElementById('btn-confirm-edit').addEventListener('click', async () => {
+  if (pendingEditIndex === null) return;
+  const index = pendingEditIndex;
+  const name = document.getElementById('editRouteName').value.trim();
+  const url = document.getElementById('editRouteUrl').value.trim();
+  if (!name) { showToast('线路名称不能为空', 'warning'); return; }
+  if (!url || (!url.startsWith('http://') && !url.startsWith('https://'))) {
+    showToast('URL 格式无效', 'warning'); return;
+  }
+  try {
+    await invoke('edit_custom_route', { index, name, url });
+    showToast('自定义线路更新成功！', 'success');
+    closeModal('modal-edit-route');
+    pendingEditIndex = null;
+    await refresh();
+    renderManageRoutes();
+  } catch (e) {
+    showToast(`更新失败: ${e.message}`, 'error');
+  }
+});
 
 // ===== Open Config =====
 async function openConfigDir(configDir) {
@@ -377,10 +355,7 @@ async function openConfigFile(configDir, configFile) {
   }
 }
 
-async function openAuthFile(configDir, toolId) {
-  // Codex 的 auth 文件是 auth.json
-  const authFile = 'auth.json';
-
+async function openAuthFile(configDir, authFile) {
   try {
     await invoke('open_config_file', { configDir, configFile: authFile });
     showToast('已打开 auth 文件', 'success');
@@ -466,16 +441,17 @@ async function refresh() {
 function openModal(id) { document.getElementById(id).classList.remove('hidden'); }
 function closeModal(id) {
   document.getElementById(id).classList.add('hidden');
-  // 关闭添加/编辑弹窗时清理状态
+  // 关闭添加弹窗时清理状态
   if (id === 'modal-add-route') {
     pendingAddToolId = null;
-    pendingEditIndex = null;
     document.getElementById('routeName').value = '';
     document.getElementById('routeUrl').value = '';
-    const saveBtn = document.querySelector('#modal-add-route .btn-primary');
-    if (saveBtn) {
-      saveBtn.onclick = saveNewRoute;
-    }
+  }
+  // 关闭编辑弹窗时清理状态
+  if (id === 'modal-edit-route') {
+    pendingEditIndex = null;
+    document.getElementById('editRouteName').value = '';
+    document.getElementById('editRouteUrl').value = '';
   }
 }
 
@@ -500,7 +476,7 @@ function escape(s) {
   return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
 
-// 从管理弹窗打开添加线路 — 弹出工具选择
+// 从管理弹窗打开添加线路 — 弹出工具选择 modal
 function openAddRouteFromManage() {
   const tools = toolStatuses.filter(t => t.config_exists !== undefined);
   if (tools.length === 0) {
@@ -511,15 +487,16 @@ function openAddRouteFromManage() {
     openAddRoute(tools[0].id);
     return;
   }
-  // 多个工具时弹出选择列表
-  const list = tools.map((t, i) => `${i + 1}. ${t.name}`).join('\n');
-  const choice = prompt(`选择要添加线路的工具:\n${list}`);
-  const idx = parseInt(choice) - 1;
-  if (isNaN(idx) || idx < 0 || idx >= tools.length) {
-    showToast('已取消', 'warning');
-    return;
-  }
-  openAddRoute(tools[idx].id);
+  // 多个工具时弹出工具选择 modal
+  const list = document.getElementById('tool-select-list');
+  const iconMap = { codex: 'terminal', claude: 'smart_toy', gemini: 'stars' };
+  list.innerHTML = tools.map(tool => `
+    <button onclick="openAddRoute('${tool.id}'); closeModal('modal-tool-select')" class="w-full p-3 border rounded-lg flex items-center gap-3 hover:bg-gray-50" style="border-color: var(--outline-variant);">
+      <span class="material-symbols-outlined text-sm" style="color: var(--primary);">${iconMap[tool.id] || 'apps'}</span>
+      <span class="font-medium">${escape(tool.name)}</span>
+    </button>
+  `).join('');
+  openModal('modal-tool-select');
 }
 
 // ===== Start =====

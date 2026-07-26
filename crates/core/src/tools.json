@@ -10,7 +10,8 @@
         "windows": "npm install -g @openai/codex",
         "unix": "npm install -g @openai/codex"
       },
-      "defaultConfig": "model = \"o4-mini\"\nbase_url = \"\"\n"
+      "defaultConfig": "model = \"o4-mini\"\nbase_url = \"\"\n",
+      "authFile": "auth.json"
     },
     {
       "id": "claude",

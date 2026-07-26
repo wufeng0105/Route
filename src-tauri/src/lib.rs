@@ -13,6 +13,7 @@ struct ToolStatus {
     error: Option<String>,
     config_dir: String,
     config_file: String,
+    auth_file: Option<String>,
 }
 
 /// 切换结果（返回给前端）
@@ -70,6 +71,7 @@ fn get_tool_statuses() -> Vec<ToolStatus> {
                 error,
                 config_dir: tool.config_dir.clone(),
                 config_file: tool.config_file.clone(),
+                auth_file: tool.auth_file.clone(),
             }
         })
         .collect()
